@@ -1,0 +1,18 @@
+{
+  "run_id": "phase1_pilot",
+  "started_at": "2026-09-14T06:05:21.719293+00:00",
+  "task_file": "pilot_tasks.json",
+  "model_keys": [
+    "deepseek-v4-pro"
+  ],
+  "framings": [
+    "neutral"
+  ],
+  "epochs": 1,
+  "generation_params": {
+    "temperature": 1.0,
+    "max_tokens": 4096,
+    "top_p": 1.0
+  },
+  "total_calls": 3
+}

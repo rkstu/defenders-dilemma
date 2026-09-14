@@ -1,0 +1,18 @@
+{
+  "run_id": "phase1_ir_deepseek",
+  "started_at": "2026-09-14T06:43:08.937214+00:00",
+  "task_file": "all_tasks.json",
+  "model_keys": [
+    "deepseek-v4-pro"
+  ],
+  "framings": [
+    "ir_authorized"
+  ],
+  "epochs": 1,
+  "generation_params": {
+    "temperature": 1.0,
+    "max_tokens": 4096,
+    "top_p": 1.0
+  },
+  "total_calls": 7
+}

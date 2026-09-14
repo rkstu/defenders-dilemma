@@ -1,0 +1,19 @@
+{
+  "run_id": "phase3_glm",
+  "started_at": "2026-09-14T06:43:08.937228+00:00",
+  "task_file": "all_tasks.json",
+  "model_keys": [
+    "glm-5.3"
+  ],
+  "framings": [
+    "neutral",
+    "ir_authorized"
+  ],
+  "epochs": 1,
+  "generation_params": {
+    "temperature": 1.0,
+    "max_tokens": 4096,
+    "top_p": 1.0
+  },
+  "total_calls": 14
+}
